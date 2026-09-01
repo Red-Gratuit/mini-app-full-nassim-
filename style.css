@@ -342,9 +342,10 @@ body::before {
   letter-spacing: 0.4px;
 }
 
-.tag-dur { background: rgba(255,79,94,0.15); color: var(--danger); }
-.tag-douce { background: rgba(52,211,153,0.15); color: var(--soft); }
-.tag-autre { background: rgba(245,166,35,0.15); color: var(--other); }
+.tag-hash { background: rgba(255,79,94,0.15); color: var(--danger); }
+.tag-weed { background: rgba(52,211,153,0.15); color: var(--soft); }
+.tag-dur { background: rgba(99,102,241,0.15); color: #b9c0ff; }
+.tag-autres { background: rgba(245,166,35,0.15); color: var(--other); }
 
 .product-name {
   font-size: 13.5px;

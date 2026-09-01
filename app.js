@@ -13,17 +13,17 @@ if (tg) {
 
 const STORAGE_KEY = "mini-app-vitine-avis";
 const PRODUCTS_KEY = "mini-app-vitine-produits";
-const CATEGORY_OPTIONS = ["dur", "douce", "autre"];
+const CATEGORY_OPTIONS = ["hash", "weed", "dur", "autres"];
 
 const DEFAULT_PRODUITS = [
-  { id: 1, nom: "Maillot Domicile", prix: 39.90, qte: 12, cat: "dur", icon: "👕", image: "", mediaType: "image" },
-  { id: 2, nom: "Écharpe Supporter", prix: 14.90, qte: 18, cat: "douce", icon: "🧣", image: "", mediaType: "image" },
+  { id: 1, nom: "Maillot Domicile", prix: 39.90, qte: 12, cat: "hash", icon: "👕", image: "", mediaType: "image" },
+  { id: 2, nom: "Écharpe Supporter", prix: 14.90, qte: 18, cat: "weed", icon: "🧣", image: "", mediaType: "image" },
   { id: 3, nom: "Casquette Club", prix: 19.90, qte: 9, cat: "dur", icon: "🧢", image: "", mediaType: "image" },
-  { id: 4, nom: "Coussin Logo", prix: 22.00, qte: 7, cat: "douce", icon: "🛋️", image: "", mediaType: "image" },
-  { id: 5, nom: "Porte-clés", prix: 6.50, qte: 25, cat: "autre", icon: "🔑", image: "", mediaType: "image" },
-  { id: 6, nom: "Sac de Sport", prix: 29.90, qte: 11, cat: "dur", icon: "🎒", image: "", mediaType: "image" },
-  { id: 7, nom: "Bonnet Chaud", prix: 16.90, qte: 14, cat: "douce", icon: "🧢", image: "", mediaType: "image" },
-  { id: 8, nom: "Mug Collector", prix: 11.00, qte: 20, cat: "autre", icon: "☕", image: "", mediaType: "image" },
+  { id: 4, nom: "Coussin Logo", prix: 22.00, qte: 7, cat: "weed", icon: "🛋️", image: "", mediaType: "image" },
+  { id: 5, nom: "Porte-clés", prix: 6.50, qte: 25, cat: "autres", icon: "🔑", image: "", mediaType: "image" },
+  { id: 6, nom: "Sac de Sport", prix: 29.90, qte: 11, cat: "hash", icon: "🎒", image: "", mediaType: "image" },
+  { id: 7, nom: "Bonnet Chaud", prix: 16.90, qte: 14, cat: "dur", icon: "🧢", image: "", mediaType: "image" },
+  { id: 8, nom: "Mug Collector", prix: 11.00, qte: 20, cat: "autres", icon: "☕", image: "", mediaType: "image" },
 ];
 
 const AVIS_DEFAUT = [
@@ -99,7 +99,7 @@ function normalizeProduct(product, fallbackIndex = 0) {
     description: typeof product?.description === "string" ? product.description.trim() : "",
     prix: Number(primaryTier.prix ?? 0),
     qte: Number(primaryTier.qte ?? 0),
-    cat: CATEGORY_OPTIONS.includes(product?.cat) ? product.cat : "autre",
+    cat: CATEGORY_OPTIONS.includes(product?.cat) ? product.cat : "autres",
     icon: product?.icon || "🛍️",
     image: product?.image || "",
     mediaType: product?.mediaType === "video" ? "video" : "image",
@@ -205,10 +205,11 @@ function renderProduits(filter = "tous") {
     const card = document.createElement("div");
     card.className = "product-card";
     card.dataset.id = product.id;
+    const categoryLabel = getCategoryLabel(product.cat);
     card.innerHTML = `
       <div class="product-media">${getMediaMarkup(product)}</div>
       <div class="product-body">
-        <span class="product-tag tag-${product.cat}">${product.cat}</span>
+        <span class="product-tag tag-${product.cat}">${categoryLabel}</span>
         <span class="product-name">${product.nom}</span>
         <span class="product-price">${getProductPriceLabel(product)}</span>
         <span class="product-stock">${product.prixParQuantite && product.prixParQuantite.length > 1 ? `${product.prixParQuantite.length} tarifs disponibles` : `Stock: ${product.qte}`}</span>
@@ -236,6 +237,16 @@ function renderAvis() {
   });
 }
 
+function getCategoryLabel(cat) {
+  const map = {
+    hash: "Hash",
+    weed: "Weed",
+    dur: "Dur",
+    autres: "Autres"
+  };
+  return map[cat] || "Autres";
+}
+
 function openProductDetail(product) {
   const modal = document.getElementById("product-modal");
   const content = document.getElementById("product-detail-content");
@@ -243,7 +254,7 @@ function openProductDetail(product) {
   content.innerHTML = `
     <div class="detail-media">${getMediaMarkup(product)}</div>
     <div class="detail-info">
-      <span class="product-tag tag-${product.cat}">${product.cat}</span>
+      <span class="product-tag tag-${product.cat}">${getCategoryLabel(product.cat)}</span>
       <h3>${product.nom}</h3>
       ${product.description ? `<p class="detail-description">${product.description}</p>` : ""}
       <div class="detail-prices">${getProductTiersMarkup(product)}</div>
@@ -364,7 +375,7 @@ function renderAdminProducts() {
       <div class="admin-product-text">
         <strong>${product.nom}</strong>
         <span>${getProductPriceLabel(product)}</span>
-        <small>${product.cat}</small>
+        <small>${getCategoryLabel(product.cat)}</small>
       </div>
       <div class="admin-buttons">
         <button type="button" data-action="edit" data-id="${product.id}">Modifier</button>
