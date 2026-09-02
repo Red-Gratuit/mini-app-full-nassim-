@@ -4,6 +4,7 @@
 
 import json
 import os
+from threading import Lock
 
 import requests
 from flask import Flask, jsonify, request, send_from_directory
@@ -12,12 +13,14 @@ BOT_TOKEN = os.environ.get("BOT_TOKEN")
 TELEGRAM_API_URL = f"https://api.telegram.org/bot{BOT_TOKEN}" if BOT_TOKEN else ""
 CANAL_URL = "https://t.me/+QmM6N0VtnDllYzBk"
 CONTACT_URL = "https://snapchat.com/add/El.Doctor59"
+PRODUCTS_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "products.json")
+products_lock = Lock()
 
 
 def build_mini_app_url():
     mini_app_url = os.environ.get("MINI_APP_URL") or os.environ.get("RAILWAY_PUBLIC_DOMAIN") or ""
     if not mini_app_url:
-        return "https://example.com"
+        return "https://mini-app-full-nassim-production.up.railway.app"
     if not mini_app_url.startswith("http://") and not mini_app_url.startswith("https://"):
         return "https://" + mini_app_url
     return mini_app_url.rstrip("/")
@@ -116,6 +119,58 @@ def set_webhook(webhook_url):
 @app.get("/health")
 def health():
     return jsonify({"ok": True, "service": "mini-app-shop"})
+
+
+def read_products():
+    try:
+        with open(PRODUCTS_FILE, "r", encoding="utf-8") as products_file:
+            products = json.load(products_file)
+        return products if isinstance(products, list) else []
+    except (FileNotFoundError, json.JSONDecodeError):
+        return []
+
+
+def write_products(products):
+    temporary_file = f"{PRODUCTS_FILE}.tmp"
+    with open(temporary_file, "w", encoding="utf-8") as products_file:
+        json.dump(products, products_file, ensure_ascii=False)
+    os.replace(temporary_file, PRODUCTS_FILE)
+
+
+@app.get("/api/products")
+def products():
+    with products_lock:
+        return jsonify(read_products())
+
+
+@app.post("/api/products")
+def save_product():
+    product = request.get_json(silent=True)
+    if not isinstance(product, dict) or not product.get("nom"):
+        return jsonify({"error": "Produit invalide"}), 400
+
+    with products_lock:
+        stored_products = read_products()
+        product_id = product.get("id")
+        matching_index = next(
+            (index for index, item in enumerate(stored_products) if item.get("id") == product_id),
+            None,
+        )
+        if matching_index is None:
+            stored_products.insert(0, product)
+        else:
+            stored_products[matching_index] = product
+        write_products(stored_products)
+    return jsonify(product)
+
+
+@app.delete("/api/products/<int:product_id>")
+def delete_product(product_id):
+    with products_lock:
+        stored_products = read_products()
+        updated_products = [item for item in stored_products if item.get("id") != product_id]
+        write_products(updated_products)
+    return jsonify({"ok": True})
 
 
 @app.get("/")

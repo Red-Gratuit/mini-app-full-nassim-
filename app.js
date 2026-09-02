@@ -13,6 +13,7 @@ if (tg) {
 
 const STORAGE_KEY = "mini-app-vitine-avis";
 const PRODUCTS_KEY = "mini-app-vitine-produits";
+const PRODUCTS_API_URL = "/api/products";
 const CATEGORY_OPTIONS = ["hash", "weed", "dur", "autres"];
 
 const DEFAULT_PRODUITS = [
@@ -125,6 +126,33 @@ function saveProduits(list) {
   } catch (error) {
     // Storage inaccessible, on ignore.
   }
+}
+
+async function loadSharedProduits() {
+  try {
+    const response = await fetch(PRODUCTS_API_URL, { cache: "no-store" });
+    if (!response.ok) throw new Error("Impossible de charger les produits");
+    const products = await response.json();
+    if (!Array.isArray(products)) throw new Error("Réponse invalide");
+    return products.map((product, index) => normalizeProduct(product, index));
+  } catch (error) {
+    return loadProduits();
+  }
+}
+
+async function saveSharedProduct(product) {
+  const response = await fetch(PRODUCTS_API_URL, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(product)
+  });
+  if (!response.ok) throw new Error("Impossible d'enregistrer le produit");
+  return normalizeProduct(await response.json());
+}
+
+async function deleteSharedProduct(productId) {
+  const response = await fetch(`${PRODUCTS_API_URL}/${productId}`, { method: "DELETE" });
+  if (!response.ok) throw new Error("Impossible de supprimer le produit");
 }
 
 function normalizeProductSignature(product) {
@@ -425,38 +453,43 @@ function createProductFromForm() {
   return product;
 }
 
-function saveProductForm(event) {
+async function saveProductForm(event) {
   event.preventDefault();
   const product = createProductFromForm();
   if (!product) return;
 
-  const index = PRODUITS.findIndex(item => item.id === product.id);
-  if (index >= 0) {
-    PRODUITS[index] = product;
-  } else {
-    PRODUITS.unshift(product);
+  try {
+    const savedProduct = await saveSharedProduct(product);
+    const index = PRODUITS.findIndex(item => item.id === savedProduct.id);
+    if (index >= 0) PRODUITS[index] = savedProduct;
+    else PRODUITS.unshift(savedProduct);
+    saveProduits(PRODUITS);
+    renderProduits(selectedFilter);
+    renderAdminProducts();
+    resetProductForm();
+    showToast("Produit enregistré avec succès.");
+  } catch (error) {
+    showToast("Erreur : produit non enregistré.");
+    return;
   }
-
-  saveProduits(PRODUITS);
-  renderProduits(selectedFilter);
-  renderAdminProducts();
-  resetProductForm();
-  showToast("Produit enregistré avec succès.");
 
   if (tg && tg.HapticFeedback) {
     tg.HapticFeedback.notificationOccurred("success");
   }
 }
 
-function deleteProduct(productId) {
-  PRODUITS = PRODUITS.filter(item => item.id !== productId);
-  saveProduits(PRODUITS);
-  renderProduits(selectedFilter);
-  renderAdminProducts();
-  if (document.getElementById("product-id").value == productId) {
-    resetProductForm();
+async function deleteProduct(productId) {
+  try {
+    await deleteSharedProduct(productId);
+    PRODUITS = PRODUITS.filter(item => item.id !== productId);
+    saveProduits(PRODUITS);
+    renderProduits(selectedFilter);
+    renderAdminProducts();
+    if (document.getElementById("product-id").value == productId) resetProductForm();
+    showToast("Produit supprimé.");
+  } catch (error) {
+    showToast("Erreur : produit non supprimé.");
   }
-  showToast("Produit supprimé.");
 }
 
 function openAdminPanel() {
@@ -632,9 +665,9 @@ const navbar = document.getElementById("navbar");
 const audio = document.getElementById("bg-audio");
 const muteBtn = document.getElementById("mute-btn");
 
-window.addEventListener("DOMContentLoaded", () => {
+window.addEventListener("DOMContentLoaded", async () => {
   clearLegacyDemoData();
-  PRODUITS = loadProduits();
+  PRODUITS = await loadSharedProduits();
   renderPriceTierRows([{ qte: 1, prix: "" }]);
   renderProduits();
   renderAvis();
