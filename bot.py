@@ -29,6 +29,12 @@ def build_mini_app_url():
 
 MINI_APP_URL = build_mini_app_url()
 app = Flask(__name__, static_url_path="", static_folder=".")
+app.config["MAX_CONTENT_LENGTH"] = 700 * 1024 * 1024
+
+
+@app.errorhandler(413)
+def request_too_large(_error):
+    return jsonify({"error": "La vidéo dépasse la taille maximale autorisée de 500 Mo."}), 413
 
 
 def send_message(chat_id, text, reply_markup=None):

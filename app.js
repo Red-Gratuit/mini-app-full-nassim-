@@ -147,7 +147,16 @@ async function saveSharedProduct(product) {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(product)
   });
-  if (!response.ok) throw new Error("Impossible d'enregistrer le produit");
+  if (!response.ok) {
+    let message = "Impossible d'enregistrer le produit.";
+    try {
+      const error = await response.json();
+      if (error.error) message = error.error;
+    } catch (parseError) {
+      if (response.status === 413) message = "La vidéo dépasse la taille maximale autorisée de 500 Mo.";
+    }
+    throw new Error(message);
+  }
   return normalizeProduct(await response.json());
 }
 
@@ -470,7 +479,7 @@ async function saveProductForm(event) {
     resetProductForm();
     showToast("Produit enregistré avec succès.");
   } catch (error) {
-    showToast("Erreur : produit non enregistré.");
+    showToast(`Erreur : ${error.message || "produit non enregistré."}`);
     return;
   }
 
