@@ -3,8 +3,10 @@
 """Mini app boutique + bot Telegram pour Railway."""
 
 import json
+import mimetypes
 import os
 from threading import Lock
+from uuid import uuid4
 
 import requests
 from flask import Flask, jsonify, request, send_from_directory
@@ -14,7 +16,8 @@ TELEGRAM_API_URL = f"https://api.telegram.org/bot{BOT_TOKEN}" if BOT_TOKEN else 
 CANAL_URL = "https://t.me/+QmM6N0VtnDllYzBk"
 CONTACT_URL = "https://snapchat.com/add/El.Doctor59"
 PRODUCTS_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "products.json")
-MAX_MEDIA_SIZE_BYTES = 500 * 1024 * 1024
+UPLOADS_FOLDER = os.path.join(os.path.dirname(os.path.abspath(__file__)), "uploads")
+MAX_MEDIA_SIZE_BYTES = 50 * 1024 * 1024
 products_lock = Lock()
 
 
@@ -29,12 +32,12 @@ def build_mini_app_url():
 
 MINI_APP_URL = build_mini_app_url()
 app = Flask(__name__, static_url_path="", static_folder=".")
-app.config["MAX_CONTENT_LENGTH"] = 700 * 1024 * 1024
+app.config["MAX_CONTENT_LENGTH"] = MAX_MEDIA_SIZE_BYTES + 1024 * 1024
 
 
 @app.errorhandler(413)
 def request_too_large(_error):
-    return jsonify({"error": "La vidéo dépasse la taille maximale autorisée de 500 Mo."}), 413
+    return jsonify({"error": "Le fichier dépasse la taille maximale autorisée de 50 Mo."}), 413
 
 
 def send_message(chat_id, text, reply_markup=None):
@@ -148,6 +151,9 @@ def validate_product_media(product):
     media = product.get("image", "")
     if not media:
         return True
+    if isinstance(media, str) and media.startswith("/uploads/"):
+        filename = media[len("/uploads/"):]
+        return filename == os.path.basename(filename) and os.path.isfile(os.path.join(UPLOADS_FOLDER, filename))
     if not isinstance(media, str) or not media.startswith("data:"):
         return False
 
@@ -171,11 +177,28 @@ def products():
 
 @app.post("/api/products")
 def save_product():
-    product = request.get_json(silent=True)
+    media_file = request.files.get("media")
+    if request.mimetype == "multipart/form-data":
+        try:
+            product = json.loads(request.form.get("product", ""))
+        except json.JSONDecodeError:
+            product = None
+    else:
+        product = request.get_json(silent=True)
     if not isinstance(product, dict) or not product.get("nom"):
         return jsonify({"error": "Produit invalide"}), 400
+    if media_file:
+        media_type = (media_file.mimetype or "").lower()
+        if not (media_type.startswith("image/") or media_type.startswith("video/")):
+            return jsonify({"error": "Choisis une image ou une vidéo valide."}), 400
+        extension = mimetypes.guess_extension(media_type) or ""
+        filename = f"{uuid4().hex}{extension}"
+        os.makedirs(UPLOADS_FOLDER, exist_ok=True)
+        media_file.save(os.path.join(UPLOADS_FOLDER, filename))
+        product["image"] = f"/uploads/{filename}"
+        product["mediaType"] = "video" if media_type.startswith("video/") else "image"
     if not validate_product_media(product):
-        return jsonify({"error": "Photo ou vidéo invalide ou supérieure à 500 Mo"}), 400
+        return jsonify({"error": "Photo ou vidéo invalide ou supérieure à 50 Mo"}), 400
 
     with products_lock:
         stored_products = read_products()

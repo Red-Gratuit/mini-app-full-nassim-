@@ -15,7 +15,7 @@ const STORAGE_KEY = "mini-app-vitine-avis";
 const PRODUCTS_KEY = "mini-app-vitine-produits";
 const PRODUCTS_API_URL = "/api/products";
 const CATEGORY_OPTIONS = ["hash", "weed", "dur", "autres"];
-const MAX_MEDIA_SIZE_BYTES = 500 * 1024 * 1024;
+const MAX_MEDIA_SIZE_BYTES = 50 * 1024 * 1024;
 
 const DEFAULT_PRODUITS = [
   { id: 1, nom: "Maillot Domicile", prix: 39.90, qte: 12, cat: "hash", icon: "👕", image: "", mediaType: "image" },
@@ -45,6 +45,8 @@ const DEMO_REVIEW_NAMES = new Set(
 
 let selectedMediaData = null;
 let selectedMediaType = "image";
+let selectedMediaFile = null;
+let selectedMediaPreviewUrl = null;
 let currentProductId = null;
 let selectedFilter = "tous";
 
@@ -141,19 +143,25 @@ async function loadSharedProduits() {
   }
 }
 
-async function saveSharedProduct(product) {
-  const response = await fetch(PRODUCTS_API_URL, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(product)
-  });
+async function saveSharedProduct(product, mediaFile = null) {
+  const options = { method: "POST" };
+  if (mediaFile) {
+    const formData = new FormData();
+    formData.append("product", JSON.stringify(product));
+    formData.append("media", mediaFile, mediaFile.name);
+    options.body = formData;
+  } else {
+    options.headers = { "Content-Type": "application/json" };
+    options.body = JSON.stringify(product);
+  }
+  const response = await fetch(PRODUCTS_API_URL, options);
   if (!response.ok) {
     let message = "Impossible d'enregistrer le produit.";
     try {
       const error = await response.json();
       if (error.error) message = error.error;
     } catch (parseError) {
-      if (response.status === 413) message = "La vidéo dépasse la taille maximale autorisée de 500 Mo.";
+      if (response.status === 413) message = "Le fichier dépasse la taille maximale autorisée de 50 Mo.";
     }
     throw new Error(message);
   }
@@ -374,6 +382,9 @@ function resetProductForm() {
   document.getElementById("admin-product-form").reset();
   document.getElementById("product-id").value = "";
   currentProductId = null;
+  if (selectedMediaPreviewUrl) URL.revokeObjectURL(selectedMediaPreviewUrl);
+  selectedMediaPreviewUrl = null;
+  selectedMediaFile = null;
   selectedMediaData = null;
   selectedMediaType = "image";
   document.getElementById("product-price").value = "";
@@ -396,6 +407,9 @@ function populateProductForm(product) {
   document.getElementById("product-quantity").value = firstTier.qte;
   renderPriceTierRows(tiers.length ? tiers : [{ qte: firstTier.qte, prix: firstTier.prix }]);
 
+  if (selectedMediaPreviewUrl) URL.revokeObjectURL(selectedMediaPreviewUrl);
+  selectedMediaPreviewUrl = null;
+  selectedMediaFile = null;
   selectedMediaData = product.image || "";
   selectedMediaType = product.mediaType === "video" ? "video" : "image";
   setMediaPreview(selectedMediaData, selectedMediaType);
@@ -449,7 +463,7 @@ function createProductFromForm() {
     qte: Number(legacyQte > 0 ? legacyQte : primaryTier.qte),
     cat,
     icon: existing?.icon || "🛍️",
-    image: selectedMediaData || existing?.image || "",
+    image: selectedMediaFile ? "" : (selectedMediaData || existing?.image || ""),
     mediaType: selectedMediaType || existing?.mediaType || "image",
     prixParQuantite: sortedTiers.map(tier => ({ qte: Number(tier.qte), prix: Number(tier.prix) }))
   };
@@ -469,7 +483,7 @@ async function saveProductForm(event) {
   if (!product) return;
 
   try {
-    const savedProduct = await saveSharedProduct(product);
+    const savedProduct = await saveSharedProduct(product, selectedMediaFile);
     const index = PRODUITS.findIndex(item => item.id === savedProduct.id);
     if (index >= 0) PRODUITS[index] = savedProduct;
     else PRODUITS.unshift(savedProduct);
@@ -562,18 +576,16 @@ function readFileToDataUrl(file) {
   }
 
   if (file.size > MAX_MEDIA_SIZE_BYTES) {
-    showToast("Le fichier ne doit pas dépasser 500 Mo.");
+    showToast("Le fichier ne doit pas dépasser 50 Mo.");
+    document.getElementById("product-media").value = "";
     return;
   }
 
-  const reader = new FileReader();
-  reader.onload = (event) => {
-    const result = event.target.result;
-    selectedMediaData = result;
-    selectedMediaType = file.type.startsWith("video") ? "video" : "image";
-    setMediaPreview(result, selectedMediaType);
-  };
-  reader.readAsDataURL(file);
+  if (selectedMediaPreviewUrl) URL.revokeObjectURL(selectedMediaPreviewUrl);
+  selectedMediaFile = file;
+  selectedMediaType = file.type.startsWith("video") ? "video" : "image";
+  selectedMediaPreviewUrl = URL.createObjectURL(file);
+  setMediaPreview(selectedMediaPreviewUrl, selectedMediaType);
 }
 
 function setupLogoTripleClick() {
