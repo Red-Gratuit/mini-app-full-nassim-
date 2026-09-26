@@ -24,7 +24,7 @@ products_lock = Lock()
 def build_mini_app_url():
     mini_app_url = os.environ.get("MINI_APP_URL") or os.environ.get("RAILWAY_PUBLIC_DOMAIN") or ""
     if not mini_app_url:
-        return "https://mini-app-full-nassim-production.up.railway.app"
+        return "https://telegram-charm-revive.lovable.app/"
     if not mini_app_url.startswith("http://") and not mini_app_url.startswith("https://"):
         return "https://" + mini_app_url
     return mini_app_url.rstrip("/")
